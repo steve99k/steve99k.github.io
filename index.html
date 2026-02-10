@@ -6,7 +6,6 @@
     <title>QR 메시지</title>
 
     <style>
-      /* ===== Page base (Option 2: bright background + black text) ===== */
       body {
         margin: 0;
         padding: 0;
@@ -17,7 +16,6 @@
         overflow: hidden;
       }
 
-      /* ===== Image ===== */
       #image-container {
         margin-top: 18px;
       }
@@ -26,18 +24,19 @@
         max-width: 90%;
         height: auto;
         border-radius: 18px;
-        opacity: 1; /* ✅ 시작은 원본 그대로 (100%) */
+        opacity: 1; /* 시작은 원본 그대로 */
       }
 
-      /* ===== Credit-style scroll container (use more of the screen) ===== */
+      /* 크레딧 영역: 화면 상단도 활용 */
       #scroll-container {
         position: absolute;
         left: 0;
         right: 0;
-        top: 12vh;      /* ✅ 상단 영역도 사용 */
-        bottom: 6vh;    /* ✅ 하단 여백 */
+        top: 12vh;
+        bottom: 6vh;
         overflow: hidden;
         padding: 0 8vw;
+        pointer-events: none; /* 터치가 아래 요소에 걸리지 않게 */
       }
 
       #scroll-text {
@@ -45,11 +44,11 @@
         white-space: pre-wrap;
         font-size: 1.25em;
         line-height: 1.55;
-        transform: translateY(100%); /* 시작은 아래 */
+        transform: translateY(100%); /* 시작은 아래 (JS가 제어) */
         will-change: transform;
       }
 
-      /* ===== Video ===== */
+      /* Video */
       #video-container{
         display:none;
         width:100%;
@@ -59,7 +58,7 @@
         justify-content:center;
       }
 
-      /* ✅ 원본 비율 유지 + 확대 금지 (크면 줄이고, 작으면 그대로) */
+      /* 원본 비율 유지 + 확대 금지 */
       #video{
         width:auto;
         height:auto;
@@ -68,7 +67,7 @@
         object-fit:contain;
       }
 
-      /* ===== Start overlay (autoplay workaround) ===== */
+      /* Start overlay */
       #startOverlay {
         position: fixed;
         inset: 0;
@@ -95,25 +94,33 @@
         font-size: 13px;
       }
 
-      /* Optional: fade-out animation when switching from text to video */
-      .fade-out {
-        animation: fadeOut 1.2s forwards;
-      }
-      @keyframes fadeOut {
-        to { opacity: 0; }
+      /* (선택) 일시정지 표시 */
+      #pauseBadge{
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.6);
+        color: #fff;
+        font-size: 12px;
+        display: none;
+        z-index: 9998;
       }
     </style>
   </head>
 
   <body>
+    <div id="pauseBadge">일시정지</div>
+
     <!-- Start overlay -->
     <div id="startOverlay">
-      <button id="startBtn">누르고 조금 기다려줘 ▶</button>
-      <p class="hint">괜찮으니까 조금만 기다려 주십시오.</p>
+      <button id="startBtn">눌러서 시작하기 ▶</button>
+      <p class="hint">모바일에서는 소리가 나오려면 한 번 터치가 필요해요.</p>
     </div>
 
     <!-- Audio -->
-    <audio id="song" src="song.mp3"></audio>
+    <audio id="song" src="song.mp3" preload="auto"></audio>
 
     <!-- Image -->
     <div id="image-container">
@@ -131,60 +138,63 @@
     </div>
 
     <script>
-      // ===== 1) Text lines (joined into ONE credit block) =====
+      // ===== Text lines (joined into ONE credit block) =====
       const LYRICS = [
-        { t: 0.0, text: "Lovely Sweetie에게" },
+        { text: "Olga Pechenina에게" },
 
-        { t: 4.0, text: "올가," },
-        { t: 8.0, text: "올해 생일은 작년처럼 웃으면서 준비해주지 못해서" },
-        { t: 14.0, text: "마음이 많이 무거워." },
+        { text: "올가," },
+        { text: "올해 생일은 예년처럼 웃으면서 준비해주지 못해서" },
+        { text: "마음이 많이 무거워." },
 
-        { t: 20.0, text: "네가 겪은 이 시간들이 얼마나 힘들었을지," },
-        { t: 26.0, text: "그리고 하루하루가 얼마나 길게 느껴졌을지," },
-        { t: 32.0, text: "말로 다 이해할 수 없다는 것도 알고 있어." },
+        { text: "네가 겪은 이 시간들이 얼마나 힘들었을지," },
+        { text: "그리고 하루하루가 얼마나 길게 느껴졌을지," },
+        { text: "말로 다 이해할 수 없다는 것도 알고 있어." },
 
-        { t: 42.0, text: "우리는 9년동안" },
-        { t: 46.0, text: "서로 붙어있을때도 떨어져있을때도" },
-        { t: 52.0, text: "항상 서로의 생일을 마음으로는 꼭 함께 보냈고," },
-        { t: 60.0, text: "멀리 있어도 그 하루만큼은" },
-        { t: 66.0, text: "서로를 가장 먼저 떠올리던 사람들이었는데," },
+        { text: "우리는 7년동안" },
+        { text: "서로 붙어있을때도 떨어져있을때도" },
+        { text: "항상 서로의 생일을 마음으로는 꼭 함께 보냈고," },
+        { text: "멀리 있어도 그 하루만큼은" },
+        { text: "서로를 가장 먼저 떠올리던 사람들이었는데," },
 
-        { t: 78.0, text: "작년 10월 1일," },
-        { t: 83.0, text: "결국 같은 시간을 살아가기로 약속한 사람들이 되었고," },
-        { t: 92.0, text: "그 약속은 지금도 여전히" },
-        { t: 98.0, text: "나에게 가장 분명한 기준이고 목표야." },
+        { text: "작년 10월 1일," },
+        { text: "결국 같은 시간을 살아가기로 약속한 사람들이 되었고," },
+        { text: "그 약속은 지금도 여전히" },
+        { text: "나에게 가장 분명한 기준이고 목표야." },
 
-        { t: 108.0, text: "그 사실 하나만으로도" },
-        { t: 113.0, text: "올해의 이 생일이 그냥 지나가는 날은 아니라고" },
-        { t: 121.0, text: "나는 믿어." },
+        { text: "그 사실 하나만으로도" },
+        { text: "올해의 이 생일이 그냥 지나가는 날은 아니라고" },
+        { text: "나는 믿어." },
 
-        { t: 132.0, text: "지금은 축하보다 버텨내야 할 것들이" },
-        { t: 138.0, text: "더 많은 시기일지 모르지만," },
-        { t: 145.0, text: "마음을 가볍게 만드는 말보다" },
-        { t: 151.0, text: "조용히 곁에 남아 있는 게" },
-        { t: 157.0, text: "더 필요한 시간이라는 것도 조금은 알아." },
+        { text: "지금은 축하보다 버텨내야 할 것들이" },
+        { text: "더 많은 시기일지 모르지만," },
+        { text: "마음을 가볍게 만드는 말보다" },
+        { text: "조용히 곁에 남아 있는 게" },
+        { text: "더 필요한 시간이라는 것도 알아." },
 
-        { t: 170.0, text: "그래도 오늘만큼은" },
-        { t: 175.0, text: "네가 세상에 태어난 날이고," },
-        { t: 181.0, text: "내가 가장 사랑하는 사람이 태어난 날이라는 건 변하지 않아." },
-        { t: 191.0, text: "그 사실만큼은 어떤 상황 속에서도" },
-        { t: 198.0, text: "흔들리지 않았으면 해." },
+        { text: "그래도 오늘만큼은" },
+        { text: "네가 세상에 태어난 날이고," },
+        { text: "내가 가장 사랑하는 사람이 태어난 날이라는 건 변하지 않아." },
+        { text: "그 사실만큼은 어떤 상황 속에서도" },
+        { text: "흔들리지 않았으면 해." },
 
-        { t: 208.0, text: "내가 옆에서 축하해주진 못하지만" },
-        { t: 214.0, text: "너는 절대 혼자가 아니라는 걸" },
-        { t: 219.0, text: "더 분명하게 전하고 싶어." },
+        { text: "내가 옆에 있어 주지 못하는 시간만큼" },
+        { text: "너 혼자가 아니라는 걸" },
+        { text: "더 분명하게 전하고 싶어." },
 
-        { t: 228.0, text: "말을 많이 하지 않아도," },
-        { t: 233.0, text: "내가 너를 슬프게 만들고" },
-        { t: 238.0, text: "자주 웃지 못하는 날들이 이어져도," },
+        { text: "말을 많이 하지 않아도," },
+        { text: "내가 너를 슬프게 만들고" },
+        { text: "자주 웃지 못하는 날들이 이어져도," },
 
-        { t: 246.0, text: "기쁠 때도 이렇게 조용한 때도" },
-        { t: 252.0, text: "나는 언제나 네 편이고, 네 사람이고, 네 남편이야." },
+        { text: "기쁠 때도 이렇게 조용한 때도" },
+        { text: "나는 언제나 네 편이고, 네 사람이고, 네 남편이야." },
 
-        { t: 256.0, text: "생일 축하해, 내 사랑스러운 아내." },
-        { t: 258.0, text: "오늘만큼은 어제보다는 더 웃었으면 좋겠어" },
-        { t: 260.0, text: "남편 김형철♡ 올림." }
+        { text: "생일 축하해, 내 아내." },
+        { text: "지금은 조용하게, 하지만 예전보다 더 단단하게," },
+        { text: "그리고 분명하게 사랑하고 있어." }
       ];
+
+      const HOLD_LAST = 10;      // 마지막 10초 정지
+      const PHOTO_END = 0.3;     // 사진 최종 투명도(30%)
 
       const song = document.getElementById("song");
       const scrollText = document.getElementById("scroll-text");
@@ -198,51 +208,66 @@
       const videoContainer = document.getElementById("video-container");
       const video = document.getElementById("video");
 
-      // ===== Build ONE big credit block =====
+      const pauseBadge = document.getElementById("pauseBadge");
+
+      let isStarted = false;
+      let rafId = null;
+
+      // 크레딧 위치 계산값
+      let startY = 0;  // translateY(100%)를 px로 환산한 값(컨테이너 높이)
+      let endY = 0;    // 마지막에 멈출 위치(px)
+      let totalDur = 261; // fallback
+
       function buildCreditText() {
         scrollText.textContent = LYRICS.map(x => x.text).join("\n\n");
       }
 
-      // ===== Credit scroll: move for (total - 10s), then HOLD last 10s visibly =====
-      function startCreditScroll() {
-        const total = song.duration || 261;
-        const hold = 10;                          // 마지막 10초 정지
-        const scrollDur = Math.max(total - hold, 1);
+      function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+      function lerp(a, b, t){ return a + (b - a) * t; }
 
-        // reset (start from below)
-        scrollText.style.transition = "none";
-        scrollText.style.transform = "translateY(100%)";
+      function recalcPositions() {
+        // duration 확보
+        totalDur = song.duration || 261;
 
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const containerHeight = scrollContainer.clientHeight;
-            const textHeight = scrollText.scrollHeight;
+        // 시작 위치: translateY(100%) => 컨테이너 높이만큼 아래로 내린 것과 유사
+        const containerH = scrollContainer.clientHeight;
+        const textH = scrollText.scrollHeight;
 
-            // ✅ 마지막 10초에 "끝부분이 화면 안에 남도록" 목표 위치 계산
-            // 목표: 텍스트의 맨 아래(마지막 줄)가 컨테이너의 65% 지점쯤에 오게
-            const targetBottomY = containerHeight * 0.65;
-            const endY = targetBottomY - textHeight; // y + textHeight = targetBottomY
+        startY = containerH; // 100% ≈ 컨테이너 높이만큼 아래
 
-            // 4:11까지 endY로 이동하고, 이후 10초는 유지
-            scrollText.style.transition = `transform ${scrollDur}s linear`;
-            scrollText.style.transform = `translateY(${endY}px)`;
-          });
-        });
+        // 마지막 10초에 "텍스트 끝이 화면 안에 남도록"
+        // 마지막 줄(텍스트 바닥)이 컨테이너 65% 지점쯤 오게
+        const targetBottomY = containerH * 0.65;
+        endY = targetBottomY - textH;
       }
 
-      // ===== Photo fade: 100% -> 30% over whole song =====
-      function startPhotoFade(){
-        const total = song.duration || 261;
+      function applyFrame() {
+        const t = song.currentTime || 0;
+        const total = totalDur;
+        const moveDur = Math.max(total - HOLD_LAST, 0.001);
 
-        photo.style.transition = "none";
-        photo.style.opacity = "1";
+        // 1) 크레딧 이동: 0~(total-10) 동안만 이동, 이후 고정
+        const moveT = clamp(t / moveDur, 0, 1);
+        const y = lerp(startY, endY, moveT);
+        scrollText.style.transform = `translateY(${y}px)`;
 
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            photo.style.transition = `opacity ${total}s linear`;
-            photo.style.opacity = "0.3";
-          });
-        });
+        // 2) 사진 opacity: 전체 시간 동안 1.0 -> PHOTO_END
+        const fadeT = clamp(t / total, 0, 1);
+        const op = lerp(1.0, PHOTO_END, fadeT);
+        photo.style.opacity = String(op);
+
+        // 계속 재생중이면 다음 프레임
+        rafId = requestAnimationFrame(applyFrame);
+      }
+
+      function startRenderLoop() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(applyFrame);
+      }
+
+      function stopRenderLoop() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
       }
 
       async function startExperience() {
@@ -254,11 +279,20 @@
         scrollContainer.style.display = "block";
 
         buildCreditText();
-        startCreditScroll();
-        startPhotoFade();
+
+        // 레이아웃 계산을 위해 한 프레임 뒤에 위치 계산
+        requestAnimationFrame(() => {
+          recalcPositions();
+          // 시작 프레임 강제 적용(0초 기준)
+          scrollText.style.transform = `translateY(${startY}px)`;
+          photo.style.opacity = "1";
+        });
 
         try {
-          await song.play(); // ✅ user-gesture triggered
+          await song.play();
+          isStarted = true;
+          pauseBadge.style.display = "none";
+          startRenderLoop();
         } catch (e) {
           startOverlay.style.display = "flex";
           alert("재생이 막혔어요. 화면을 한 번 더 눌러서 시작해 주세요.");
@@ -266,35 +300,58 @@
         }
       }
 
-      // Start on click
+      // 시작 버튼
       startBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         startExperience();
       });
       startOverlay.addEventListener("click", startExperience);
 
-      // If metadata loads later, re-sync precisely with real duration
+      // 메타데이터 로드되면 duration/위치 정확히 재계산
       song.addEventListener("loadedmetadata", () => {
-        if (startOverlay.style.display === "none") {
-          startCreditScroll();
-          startPhotoFade();
+        if (!isStarted) return;
+        recalcPositions();
+      });
+
+      // 화면 터치로 일시정지/재개 (100% 싱크 유지: currentTime 기반)
+      document.addEventListener("click", (e) => {
+        if (!isStarted) return;
+        if (e.target && e.target.id === "startBtn") return;
+        if (e.target && e.target.closest && e.target.closest("#startOverlay")) return;
+        if (videoContainer.style.display === "flex") return; // 영상 중엔 무시(원하면 토글도 가능)
+
+        if (song.paused) {
+          song.play().then(() => {
+            pauseBadge.style.display = "none";
+            startRenderLoop();
+          }).catch(() => {});
+        } else {
+          song.pause();
+          pauseBadge.style.display = "block";
+          stopRenderLoop(); // 렌더도 멈추면 화면이 그 순간 그대로 고정
         }
       });
 
-      // On audio end -> fade out and show video
+      // 오디오 끝나면 영상으로 전환
       song.addEventListener("ended", async () => {
-        imageContainer.classList.add("fade-out");
-        scrollContainer.classList.add("fade-out");
+        stopRenderLoop();
+        pauseBadge.style.display = "none";
 
-        setTimeout(async () => {
-          imageContainer.style.display = "none";
-          scrollContainer.style.display = "none";
-          videoContainer.style.display = "flex";
+        imageContainer.style.display = "none";
+        scrollContainer.style.display = "none";
+        videoContainer.style.display = "flex";
 
-          try {
-            await video.play(); // 일부 기기에서는 추가 터치 필요할 수 있음
-          } catch (e) {}
-        }, 1200);
+        try {
+          await video.play();
+        } catch (e) {
+          // 일부 기기에서는 사용자가 Play 눌러야 함
+        }
+      });
+
+      // 창 크기 바뀌면 위치 재계산 (중요: 모바일 회전 등)
+      window.addEventListener("resize", () => {
+        if (!isStarted) return;
+        recalcPositions();
       });
     </script>
   </body>
